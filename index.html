@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC Part Compatibility Checker</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top, #141b37 0%, #05070d 55%);
+        color: #e8ecf7;
+      }
+      .checker {
+        width: min(100%, 460px);
+        padding: 2rem;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(12, 18, 41, 0.95);
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.28);
+      }
+      h1 {
+        margin: 0 0 0.65rem;
+        font-size: clamp(1.8rem, 2.5vw, 2.4rem);
+      }
+      .hint {
+        margin: 0 0 1.6rem;
+        color: #9aa4c1;
+        line-height: 1.6;
+      }
+      .field {
+        display: grid;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .cpu-bar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .cpu-option {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        color: #e8ecf7;
+        border-radius: 14px;
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        font: inherit;
+        transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease;
+      }
+      .cpu-option:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .cpu-option.active {
+        border-color: #7c6dff;
+        background: rgba(124, 109, 255, 0.18);
+        color: #ffffff;
+      }
+      .cpu-option[aria-pressed="true"] {
+        box-shadow: 0 0 0 2px rgba(124, 109, 255, 0.18);
+      }
+      label {
+        font-size: 0.95rem;
+        color: #b2bfdd;
+      }
+      select,
+      button {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        background: rgba(18, 27, 55, 0.98);
+        color: #f4f7ff;
+        font: inherit;
+        padding: 0.95rem 1rem;
+      }
+      select {
+        appearance: none;
+      }
+      button {
+        margin-top: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        background: linear-gradient(135deg, #7c6dff, #5c82ff);
+        cursor: pointer;
+        transition: transform 0.2s ease, filter 0.2s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.05);
+      }
+      #result {
+        margin-top: 1rem;
+        min-height: 3.4rem;
+        padding: 1rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="checker">
+      <h1>PcRapidChecker</h1>
+      <p class="hint">This is a minimal starter checker. Pick basic parts and press the button to see a compatibility result.</p>
+
+      <div class="field">
+        <label for="cpuSocket">CPU socket</label>
+        <select id="cpuSocket" aria-label="CPU socket selection">
+          <option value="AM4">AM4</option>
+          <option value="AM5">AM5</option>
+          <option value="LGA1200">LGA 1200</option>
+          <option value="LGA1700">LGA 1700</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="cpuModel">CPU model</label>
+        <select id="cpuModel" aria-label="CPU model selection"></select>
+      </div>
+
+      <div class="field">
+        <label for="motherboard">Motherboard chipset</label>
+        <select id="motherboard" aria-label="Motherboard chipset selection"></select>
+      </div>
+
+      <div class="field">
+        <label for="memoryType">Memory type</label>
+        <select id="memoryType">
+        </select>
+        <div id="ramInfo" style="margin-top:.6rem;color:#bfcdeb;font-size:.95rem;line-height:1.45"></div>
+      </div>
+
+      <div class="field">
+        <label>Recommended GPU</label>
+        <div id="gpuBest" style="padding:.85rem 1rem;border-radius:14px;background:rgba(255,255,255,0.02);color:#d6e4ff">Automatic</div>
+      </div>
+      <div class="field">
+        <label>Recommended PSU</label>
+        <div id="psuRec" style="padding:.85rem 1rem;border-radius:14px;background:rgba(255,255,255,0.02);color:#d6e4ff">Automatic</div>
+      </div>
+
+      <button id="checkButton" type="button">Check compatibility</button>
+      <div id="result" aria-live="polite">Awaiting input...</div>
+
+      <section style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid rgba(255,255,255,0.08);">
+        <h2 style="margin:0 0 .75rem; font-size:1.1rem; text-align:center;">Saved Your Builds
+        </h2>
+        <div class="field" style="align-items:center;">
+          <label for="buildName" style="width:100%; text-align:center;">Build name</label>
+          <input id="buildName" type="text" placeholder="My build" style="width:min(100%, 260px); margin:0 auto; border:1px solid rgba(255,255,255,0.14); border-radius:14px; background:rgba(18,27,55,0.98); color:#f4f7ff; font:inherit; padding:0.95rem 1rem;" />
+        </div>
+        <div class="field">
+          <label for="buildCpuSocket">CPU socket</label>
+          <select id="buildCpuSocket"></select>
+        </div>
+        <div class="field">
+          <label for="buildCpuModel">CPU model</label>
+          <select id="buildCpuModel"><option value="">-- select CPU model --</option></select>
+        </div>
+        <div class="field">
+          <label for="buildMotherboard">Motherboard</label>
+          <select id="buildMotherboard"><option value="">-- select motherboard --</option></select>
+        </div>
+        <div class="field">
+          <label for="buildMemoryType">Memory type</label>
+          <select id="buildMemoryType"></select>
+        </div>
+        <div class="field">
+          <label for="buildGpu">GPU choice</label>
+          <select id="buildGpu"></select>
+        </div>
+        <div style="display:flex; gap:.6rem;">
+          <button id="buildSave" type="button">Create</button>
+          <button id="buildCancel" type="button">Clear</button>
+        </div>
+        <div id="buildsList" style="margin-top:0.9rem; display:grid; gap:.5rem;"></div>
+      </section>
+    </main>
+
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      (function startCrud() {
+        if (!window.Builds || !window.Compatibility) {
+          return setTimeout(startCrud, 50)
+        }
+
+        const store = window.Builds
+        const compat = window.Compatibility
+
+        const buildNameEl = document.getElementById('buildName')
+        const socketEl = document.getElementById('buildCpuSocket')
+        const cpuModelEl = document.getElementById('buildCpuModel')
+        const boardEl = document.getElementById('buildMotherboard')
+        const memoryEl = document.getElementById('buildMemoryType')
+        const gpuEl = document.getElementById('buildGpu')
+        const saveBtn = document.getElementById('buildSave')
+        const cancelBtn = document.getElementById('buildCancel')
+        const listEl = document.getElementById('buildsList')
+
+        let editingId = null
+
+        function populateSocketOptions() {
+          socketEl.innerHTML = ''
+          Object.keys(compat.cpuModelGroupsBySocket).forEach((socket) => {
+            const opt = document.createElement('option')
+            opt.value = socket
+            opt.textContent = socket
+            socketEl.appendChild(opt)
+          })
+        }
+
+        function populateDependentOptions() {
+          const socket = socketEl.value
+
+          cpuModelEl.innerHTML = '<option value="">-- select CPU model --</option>'
+          ;(compat.cpuModelGroupsBySocket[socket] || []).forEach((group) => {
+            const models = compat.cpuDatabase[group] || []
+            if (!models.length) return
+            const optGroup = document.createElement('optgroup')
+            optGroup.label = group
+            models.forEach((model) => {
+              const opt = document.createElement('option')
+              opt.value = model
+              opt.textContent = model
+              optGroup.appendChild(opt)
+            })
+            cpuModelEl.appendChild(optGroup)
+          })
+
+          boardEl.innerHTML = '<option value="">-- select motherboard --</option>'
+          ;(compat.motherboardGroupsBySocket[socket] || []).forEach((group) => {
+            const boards = compat.motherboardDatabase[group] || []
+            if (!boards.length) return
+            const optGroup = document.createElement('optgroup')
+            optGroup.label = group
+            boards.forEach((board) => {
+              const opt = document.createElement('option')
+              opt.value = board
+              opt.textContent = board
+              optGroup.appendChild(opt)
+            })
+            boardEl.appendChild(optGroup)
+          })
+
+          memoryEl.innerHTML = ''
+          const types = Object.keys(compat.ramDatabase).filter((t) => compat.ramType[t]?.includes(socket))
+          const toAdd = types.length ? types : Object.keys(compat.ramDatabase)
+          toAdd.forEach((type) => {
+            const opt = document.createElement('option')
+            opt.value = type
+            opt.textContent = type
+            memoryEl.appendChild(opt)
+          })
+        }
+
+        function populateGpuOptions() {
+          gpuEl.innerHTML = ''
+          const options = compat.gpuOptions || []
+          options.forEach((gpu) => {
+            const opt = document.createElement('option')
+            opt.value = gpu
+            opt.textContent = gpu
+            gpuEl.appendChild(opt)
+          })
+        }
+
+        function escapeHtml(value) {
+          return String(value || '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+          }[char]))
+        }
+
+        function renderBuilds(items) {
+          listEl.innerHTML = ''
+          if (!items || !items.length) {
+            listEl.innerHTML = '<div style="color:#9aa4c1">No saved builds.</div>'
+            return
+          }
+
+          items.forEach((build) => {
+            const row = document.createElement('div')
+            row.style.display = 'flex'
+            row.style.justifyContent = 'space-between'
+            row.style.alignItems = 'center'
+            row.style.padding = '0.6rem 0.8rem'
+            row.style.border = '1px solid rgba(255,255,255,0.08)'
+            row.style.borderRadius = '12px'
+            row.style.background = 'rgba(255,255,255,0.03)'
+
+            const info = document.createElement('div')
+            info.innerHTML = `<strong>${escapeHtml(build.name)}</strong><div style="font-size:0.82rem;color:#9aa4c1;">${escapeHtml(build.cpuModel || build.cpuSocket)} — ${escapeHtml(build.motherboard || '')} — ${escapeHtml(build.memoryType || '')} — ${escapeHtml(build.gpu || '')}</div>`
+
+            const actions = document.createElement('div')
+            actions.style.display = 'flex'
+            actions.style.gap = '0.4rem'
+
+            const editBtn = document.createElement('button')
+            editBtn.type = 'button'
+            editBtn.textContent = 'Edit'
+            editBtn.style.marginTop = '0'
+            editBtn.addEventListener('click', () => editBuild(build))
+
+            const deleteBtn = document.createElement('button')
+            deleteBtn.type = 'button'
+            deleteBtn.textContent = 'Delete'
+            deleteBtn.style.marginTop = '0'
+            deleteBtn.addEventListener('click', () => {
+              if (confirm('Delete this build?')) {
+                store.delete(build.id)
+              }
+            })
+
+            actions.appendChild(editBtn)
+            actions.appendChild(deleteBtn)
+            row.appendChild(info)
+            row.appendChild(actions)
+            listEl.appendChild(row)
+          })
+        }
+
+        function resetForm() {
+          editingId = null
+          buildNameEl.value = ''
+          socketEl.value = Object.keys(compat.cpuModelGroupsBySocket)[0] || ''
+          populateDependentOptions()
+          if (gpuEl.options.length) gpuEl.selectedIndex = 0
+          saveBtn.textContent = 'Create'
+        }
+
+        function editBuild(build) {
+          editingId = build.id
+          buildNameEl.value = build.name || ''
+          socketEl.value = build.cpuSocket || socketEl.value
+          populateDependentOptions()
+          cpuModelEl.value = build.cpuModel || ''
+          boardEl.value = build.motherboard || ''
+          memoryEl.value = build.memoryType || ''
+          gpuEl.value = build.gpu || gpuEl.options[0]?.value || ''
+          saveBtn.textContent = 'Update'
+        }
+
+        saveBtn.addEventListener('click', () => {
+          const payload = {
+            name: buildNameEl.value.trim(),
+            cpuSocket: socketEl.value,
+            cpuModel: cpuModelEl.value,
+            motherboard: boardEl.value,
+            memoryType: memoryEl.value,
+            gpu: gpuEl.value,
+          }
+
+          if (!payload.name) {
+            alert('Please name the build')
+            return
+          }
+
+          if (editingId == null) {
+            store.create(payload)
+          } else {
+            store.update(editingId, payload)
+            editingId = null
+            saveBtn.textContent = 'Create'
+          }
+
+          resetForm()
+        })
+
+        cancelBtn.addEventListener('click', resetForm)
+        socketEl.addEventListener('change', populateDependentOptions)
+
+        store.subscribe(renderBuilds)
+        populateSocketOptions()
+        populateGpuOptions()
+        populateDependentOptions()
+        resetForm()
+      })()
+    </script>
+  </body>
+</html>
